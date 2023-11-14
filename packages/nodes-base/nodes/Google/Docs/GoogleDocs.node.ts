@@ -507,6 +507,66 @@ export class GoogleDocs implements INodeType {
 							}
 						}
 						responseData.documentId = documentId;
+					} else if (operation === 'getDrive') {
+						responseData = [
+							{
+								name: 'My Drive',
+								value: 'myDrive',
+							},
+							{
+								name: 'Shared with Me',
+								value: 'sharedWithMe',
+							},
+						];
+
+						const drives = await googleApiRequestAllItems.call(
+							this,
+							'drives',
+							'GET',
+							'',
+							{},
+							{},
+							'https://www.googleapis.com/drive/v3/drives',
+						);
+						for (const drive of drives) {
+							responseData.push({
+								name: drive.name as string,
+								value: drive.id as string,
+							});
+						}
+					} else if (operation === 'getFolder') {
+						responseData = [
+							{
+								name: '/',
+								value: 'default',
+							},
+						];
+						const driveId = this.getNodeParameter('driveId', i) as string;
+
+						const qs = {
+							q: `mimeType = \'application/vnd.google-apps.folder\' ${
+								driveId === 'sharedWithMe' ? 'and sharedWithMe = true' : " and 'root' in parents"
+							}`,
+							...(driveId && driveId !== 'myDrive' && driveId !== 'sharedWithMe'
+								? { driveId }
+								: {}),
+						};
+
+						const folders = await googleApiRequestAllItems.call(
+							this,
+							'files',
+							'GET',
+							'',
+							{},
+							qs,
+							'https://www.googleapis.com/drive/v3/files',
+						);
+						for (const folder of folders) {
+							responseData.push({
+								name: folder.name as string,
+								value: folder.id as string,
+							});
+						}
 					}
 				}
 			} catch (error) {

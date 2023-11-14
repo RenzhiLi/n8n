@@ -23,6 +23,16 @@ export const documentOperations: INodeProperties[] = [
 				action: 'Get a document',
 			},
 			{
+				name: 'Get Drive',
+				value: 'getDrive',
+				action: 'Get list of drives',
+			},
+			{
+				name: 'Get Folder',
+				value: 'getFolder',
+				action: 'Get list of folders',
+			},
+			{
 				name: 'Update',
 				value: 'update',
 				action: 'Update a document',
@@ -117,7 +127,24 @@ export const documentFields: INodeProperties[] = [
 		default: true,
 		description: 'Whether to return a simplified version of the response instead of the raw data',
 	},
-
+	{
+		displayName: 'Drive Name or ID',
+		name: 'driveId',
+		type: 'options',
+		description:
+			'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code-examples/expressions/">expression</a>',
+		typeOptions: {
+			loadOptionsMethod: 'getDrives',
+		},
+		default: 'myDrive',
+		required: true,
+		displayOptions: {
+			show: {
+				operation: ['getFolder'],
+				resource: ['document'],
+			},
+		},
+	},
 	/* -------------------------------------------------------------------------- */
 	/*                                 document: update                            */
 	/* -------------------------------------------------------------------------- */
