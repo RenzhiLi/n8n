@@ -5,10 +5,10 @@ import type {
 	INodeProperties,
 } from 'n8n-workflow';
 
-export class ExampleNodeApi implements ICredentialType {
-	name = 'exampleNodeApi';
+export class LiveSportsOddsApi implements ICredentialType {
+	name = 'liveSportsOddsApi';
 
-	displayName = 'Example Node API';
+	displayName = 'Live Sports Odds API';
 
 	documentationUrl = '';
 
