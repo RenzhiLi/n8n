@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 /* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
@@ -36,12 +37,16 @@ import type {
 	NodeParameterValueType,
 	PostReceiveAction,
 	JsonObject,
+	CloseFunction,
 } from './Interfaces';
-import type { NodeError } from './NodeErrors';
-import { NodeApiError, NodeOperationError } from './NodeErrors';
+
 import * as NodeHelpers from './NodeHelpers';
 
 import type { Workflow } from './Workflow';
+import type { NodeError } from './errors/abstract/node.error';
+
+import { NodeOperationError } from './errors/node-operation.error';
+import { NodeApiError } from './errors/node-api.error';
 
 export class RoutingNode {
 	additionalData: IWorkflowExecuteAdditionalData;
@@ -79,6 +84,7 @@ export class RoutingNode {
 		executeData: IExecuteData,
 		nodeExecuteFunctions: INodeExecuteFunctions,
 		credentialsDecrypted?: ICredentialsDecrypted,
+		abortSignal?: AbortSignal,
 	): Promise<INodeExecutionData[][] | null | undefined> {
 		const items = inputData.main[0] as INodeExecutionData[];
 		const returnData: INodeExecutionData[] = [];
@@ -89,6 +95,7 @@ export class RoutingNode {
 		if (nodeType.description.credentials?.length) {
 			credentialType = nodeType.description.credentials[0].name;
 		}
+		const closeFunctions: CloseFunction[] = [];
 		const executeFunctions = nodeExecuteFunctions.getExecuteFunctions(
 			this.workflow,
 			this.runExecutionData,
@@ -99,6 +106,8 @@ export class RoutingNode {
 			this.additionalData,
 			executeData,
 			this.mode,
+			closeFunctions,
+			abortSignal,
 		);
 
 		let credentials: ICredentialDataDecryptedObject | undefined;
@@ -136,6 +145,7 @@ export class RoutingNode {
 					this.additionalData,
 					executeData,
 					this.mode,
+					abortSignal,
 				);
 				const requestData: DeclarativeRestApiSettings.ResultOptions = {
 					options: {
@@ -225,7 +235,7 @@ export class RoutingNode {
 
 				let routingError = error as AxiosError;
 
-				if (error instanceof NodeApiError) routingError = error.cause as AxiosError;
+				if (error instanceof NodeApiError && error.cause) routingError = error.cause as AxiosError;
 
 				throw new NodeApiError(this.node, error as JsonObject, {
 					runIndex,
@@ -274,7 +284,7 @@ export class RoutingNode {
 		runIndex: number,
 	): Promise<INodeExecutionData[]> {
 		if (typeof action === 'function') {
-			return action.call(executeSingleFunctions, inputData, responseData);
+			return await action.call(executeSingleFunctions, inputData, responseData);
 		}
 		if (action.type === 'rootProperty') {
 			try {
@@ -524,19 +534,20 @@ export class RoutingNode {
 		const executePaginationFunctions = {
 			...executeSingleFunctions,
 			makeRoutingRequest: async (requestOptions: DeclarativeRestApiSettings.ResultOptions) => {
-				return this.rawRoutingRequest(
+				return await this.rawRoutingRequest(
 					executeSingleFunctions,
 					requestOptions,
 					credentialType,
 					credentialsDecrypted,
-				).then(async (data) =>
-					this.postProcessResponseData(
-						executeSingleFunctions,
-						data,
-						requestData,
-						itemIndex,
-						runIndex,
-					),
+				).then(
+					async (data) =>
+						await this.postProcessResponseData(
+							executeSingleFunctions,
+							data,
+							requestData,
+							itemIndex,
+							runIndex,
+						),
 				);
 			},
 		};
@@ -639,14 +650,15 @@ export class RoutingNode {
 							requestData,
 							credentialType,
 							credentialsDecrypted,
-						).then(async (data) =>
-							this.postProcessResponseData(
-								executeSingleFunctions,
-								data,
-								requestData,
-								itemIndex,
-								runIndex,
-							),
+						).then(
+							async (data) =>
+								await this.postProcessResponseData(
+									executeSingleFunctions,
+									data,
+									requestData,
+									itemIndex,
+									runIndex,
+								),
 						);
 
 						(requestData.options[optionsType] as IDataObject)[properties.offsetParameter] =
@@ -684,14 +696,15 @@ export class RoutingNode {
 				requestData,
 				credentialType,
 				credentialsDecrypted,
-			).then(async (data) =>
-				this.postProcessResponseData(
-					executeSingleFunctions,
-					data,
-					requestData,
-					itemIndex,
-					runIndex,
-				),
+			).then(
+				async (data) =>
+					await this.postProcessResponseData(
+						executeSingleFunctions,
+						data,
+						requestData,
+						itemIndex,
+						runIndex,
+					),
 			);
 		}
 		return responseData;

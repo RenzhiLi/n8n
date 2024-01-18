@@ -17,7 +17,7 @@ import type {
 
 import { BINARY_ENCODING, NodeOperationError } from 'n8n-workflow';
 
-import moment from 'moment';
+import moment from 'moment-timezone';
 import { channelFields, channelOperations } from './ChannelDescription';
 import { messageFields, messageOperations } from './MessageDescription';
 import { starFields, starOperations } from './StarDescription';
@@ -1171,6 +1171,11 @@ export class SlackV2 implements INodeType {
 					if (operation === 'getPresence') {
 						qs.user = this.getNodeParameter('user', i, undefined, { extractValue: true }) as string;
 						responseData = await slackApiRequest.call(this, 'GET', '/users.getPresence', {}, qs);
+					}
+					if (operation === 'getProfile') {
+						qs.user = this.getNodeParameter('user', i, undefined, { extractValue: true }) as string;
+						responseData = await slackApiRequest.call(this, 'GET', '/users.profile.get', {}, qs);
+						responseData = responseData.profile;
 					}
 					if (operation === 'updateProfile') {
 						const options = this.getNodeParameter('options', i);

@@ -1,8 +1,6 @@
 import type { SuperAgentTest } from 'supertest';
-import { License } from '@/License';
 import type { User } from '@db/entities/User';
 
-import { mockInstance } from '../shared/mocking';
 import * as testDb from './shared/testDb';
 import * as utils from './shared/utils/';
 import { createOwner, createUser } from './shared/db/users';
@@ -14,12 +12,10 @@ let authOwnerAgent: SuperAgentTest;
 let member: User;
 let authMemberAgent: SuperAgentTest;
 
-const licenseLike = mockInstance(License, {
-	isWorkflowHistoryLicensed: jest.fn().mockReturnValue(true),
-	isWithinUsersLimit: jest.fn().mockReturnValue(true),
+const testServer = utils.setupTestServer({
+	endpointGroups: ['workflowHistory'],
+	enabledFeatures: ['feat:workflowHistory'],
 });
-
-const testServer = utils.setupTestServer({ endpointGroups: ['workflowHistory'] });
 
 beforeAll(async () => {
 	owner = await createOwner();
@@ -28,17 +24,13 @@ beforeAll(async () => {
 	authMemberAgent = testServer.authAgentFor(member);
 });
 
-beforeEach(() => {
-	licenseLike.isWorkflowHistoryLicensed.mockReturnValue(true);
-});
-
 afterEach(async () => {
 	await testDb.truncate(['Workflow', 'SharedWorkflow', 'WorkflowHistory']);
 });
 
 describe('GET /workflow-history/:workflowId', () => {
 	test('should not work when license is not available', async () => {
-		licenseLike.isWorkflowHistoryLicensed.mockReturnValue(false);
+		testServer.license.disable('feat:workflowHistory');
 		const resp = await authOwnerAgent.get('/workflow-history/workflow/badid');
 		expect(resp.status).toBe(403);
 		expect(resp.text).toBe('Workflow History license data not found');
@@ -68,8 +60,9 @@ describe('GET /workflow-history/:workflowId', () => {
 		const versions = await Promise.all(
 			new Array(10)
 				.fill(undefined)
-				.map(async (_, i) =>
-					createWorkflowHistoryItem(workflow.id, { createdAt: new Date(Date.now() + i) }),
+				.map(
+					async (_, i) =>
+						await createWorkflowHistoryItem(workflow.id, { createdAt: new Date(Date.now() + i) }),
 				),
 		);
 
@@ -92,13 +85,14 @@ describe('GET /workflow-history/:workflowId', () => {
 		const versions = await Promise.all(
 			new Array(10)
 				.fill(undefined)
-				.map(async (_, i) =>
-					createWorkflowHistoryItem(workflow.id, { createdAt: new Date(Date.now() + i) }),
+				.map(
+					async (_, i) =>
+						await createWorkflowHistoryItem(workflow.id, { createdAt: new Date(Date.now() + i) }),
 				),
 		);
 
 		const versions2 = await Promise.all(
-			new Array(10).fill(undefined).map(async (_) => createWorkflowHistoryItem(workflow2.id)),
+			new Array(10).fill(undefined).map(async (_) => await createWorkflowHistoryItem(workflow2.id)),
 		);
 
 		const last = versions.sort((a, b) => b.createdAt.valueOf() - a.createdAt.valueOf())[0]! as any;
@@ -119,8 +113,9 @@ describe('GET /workflow-history/:workflowId', () => {
 		const versions = await Promise.all(
 			new Array(10)
 				.fill(undefined)
-				.map(async (_, i) =>
-					createWorkflowHistoryItem(workflow.id, { createdAt: new Date(Date.now() + i) }),
+				.map(
+					async (_, i) =>
+						await createWorkflowHistoryItem(workflow.id, { createdAt: new Date(Date.now() + i) }),
 				),
 		);
 
@@ -142,8 +137,9 @@ describe('GET /workflow-history/:workflowId', () => {
 		const versions = await Promise.all(
 			new Array(10)
 				.fill(undefined)
-				.map(async (_, i) =>
-					createWorkflowHistoryItem(workflow.id, { createdAt: new Date(Date.now() + i) }),
+				.map(
+					async (_, i) =>
+						await createWorkflowHistoryItem(workflow.id, { createdAt: new Date(Date.now() + i) }),
 				),
 		);
 
@@ -165,7 +161,7 @@ describe('GET /workflow-history/:workflowId', () => {
 
 describe('GET /workflow-history/workflow/:workflowId/version/:versionId', () => {
 	test('should not work when license is not available', async () => {
-		licenseLike.isWorkflowHistoryLicensed.mockReturnValue(false);
+		testServer.license.disable('feat:workflowHistory');
 		const resp = await authOwnerAgent.get('/workflow-history/workflow/badid/version/badid');
 		expect(resp.status).toBe(403);
 		expect(resp.text).toBe('Workflow History license data not found');

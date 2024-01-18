@@ -17,9 +17,13 @@ export class EventsService extends EventEmitter {
 		super({ captureRejections: true });
 		if ('SKIP_STATISTICS_EVENTS' in process.env) return;
 
-		this.on('nodeFetchedData', async (workflowId, node) => this.nodeFetchedData(workflowId, node));
-		this.on('workflowExecutionCompleted', async (workflowData, runData) =>
-			this.workflowExecutionCompleted(workflowData, runData),
+		this.on(
+			'nodeFetchedData',
+			async (workflowId, node) => await this.nodeFetchedData(workflowId, node),
+		);
+		this.on(
+			'workflowExecutionCompleted',
+			async (workflowData, runData) => await this.workflowExecutionCompleted(workflowData, runData),
 		);
 	}
 
@@ -73,7 +77,7 @@ export class EventsService extends EventEmitter {
 			StatisticsNames.dataLoaded,
 			workflowId,
 		);
-		if (insertResult === 'failed') return;
+		if (insertResult === 'failed' || insertResult === 'alreadyExists') return;
 
 		// Compile the metrics since this was a new data loaded event
 		const owner = await this.ownershipService.getWorkflowOwnerCached(workflowId);

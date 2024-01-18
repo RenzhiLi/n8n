@@ -17,11 +17,12 @@ import {
 } from './utils';
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete';
 import type { AutocompleteOptionType, ExtensionTypeName, FnToDoc, Resolved } from './types';
-import { sanitizeHtml } from '@/utils';
+import { sanitizeHtml } from '@/utils/htmlUtils';
 import { isFunctionOption } from './typeGuards';
 import { luxonInstanceDocs } from './nativesAutocompleteDocs/luxon.instance.docs';
 import { luxonStaticDocs } from './nativesAutocompleteDocs/luxon.static.docs';
-import { useEnvironmentsStore, useExternalSecretsStore } from '@/stores';
+import { useEnvironmentsStore } from '@/stores/environments.ee.store';
+import { useExternalSecretsStore } from '@/stores/externalSecrets.ee.store';
 
 /**
  * Resolution-based completions offered according to datatype.
@@ -502,6 +503,7 @@ const regexes = {
 	doubleQuoteStringLiteral: /(".+")\.([^"{\s])*/, // "abc".
 	dateLiteral: /\(?new Date\(\(?.*?\)\)?\.([^{\s])*/, // new Date(). or (new Date()).
 	arrayLiteral: /(\[.+\])\.([^{\s])*/, // [1, 2, 3].
+	indexedAccess: /([^{\s]+\[.+\])\.([^{\s])*/, // 'abc'[0]. or 'abc'.split('')[0] or similar ones
 	objectLiteral: /\(\{.*\}\)\.([^{\s])*/, // ({}).
 
 	mathGlobal: /Math\.([^{\s])*/, // Math.

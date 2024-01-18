@@ -10,16 +10,13 @@ import Container, { Service } from 'typedi';
 
 import { Logger } from '@/Logger';
 
-import { jsonParse, type IDataObject } from 'n8n-workflow';
-import {
-	EXTERNAL_SECRETS_INITIAL_BACKOFF,
-	EXTERNAL_SECRETS_MAX_BACKOFF,
-	EXTERNAL_SECRETS_UPDATE_INTERVAL,
-} from './constants';
+import { jsonParse, type IDataObject, ApplicationError } from 'n8n-workflow';
+import { EXTERNAL_SECRETS_INITIAL_BACKOFF, EXTERNAL_SECRETS_MAX_BACKOFF } from './constants';
 import { License } from '@/License';
 import { InternalHooks } from '@/InternalHooks';
+import { updateIntervalTime } from './externalSecretsHelper.ee';
 import { ExternalSecretsProviders } from './ExternalSecretsProviders.ee';
-import { SingleMainInstancePublisher } from '@/services/orchestration/main/SingleMainInstance.publisher';
+import { SingleMainSetup } from '@/services/orchestration/main/SingleMainSetup';
 
 @Service()
 export class ExternalSecretsManager {
@@ -52,12 +49,12 @@ export class ExternalSecretsManager {
 					resolve();
 					this.initializingPromise = undefined;
 					this.updateInterval = setInterval(
-						async () => this.updateSecrets(),
-						EXTERNAL_SECRETS_UPDATE_INTERVAL,
+						async () => await this.updateSecrets(),
+						updateIntervalTime(),
 					);
 				});
 			}
-			return this.initializingPromise;
+			return await this.initializingPromise;
 		}
 	}
 
@@ -82,7 +79,7 @@ export class ExternalSecretsManager {
 	}
 
 	async broadcastReloadExternalSecretsProviders() {
-		await Container.get(SingleMainInstancePublisher).broadcastReloadExternalSecretsProviders();
+		await Container.get(SingleMainSetup).broadcastReloadExternalSecretsProviders();
 	}
 
 	private decryptSecretsSettings(value: string): ExternalSecretsSettings {
@@ -90,7 +87,7 @@ export class ExternalSecretsManager {
 		try {
 			return jsonParse(decryptedData);
 		} catch (e) {
-			throw new Error(
+			throw new ApplicationError(
 				'External Secrets Settings could not be decrypted. The likely reason is that a different "encryptionKey" was used to encrypt the data.',
 			);
 		}
@@ -113,8 +110,8 @@ export class ExternalSecretsManager {
 		}
 		const providers: Array<SecretsProvider | null> = (
 			await Promise.allSettled(
-				Object.entries(settings).map(async ([name, providerSettings]) =>
-					this.initProvider(name, providerSettings),
+				Object.entries(settings).map(
+					async ([name, providerSettings]) => await this.initProvider(name, providerSettings),
 				),
 			)
 		).map((i) => (i.status === 'rejected' ? null : i.value));

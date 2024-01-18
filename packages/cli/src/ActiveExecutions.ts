@@ -7,7 +7,7 @@ import type {
 	IRun,
 	ExecutionStatus,
 } from 'n8n-workflow';
-import { WorkflowOperationError, createDeferredPromise } from 'n8n-workflow';
+import { ApplicationError, WorkflowOperationError, createDeferredPromise } from 'n8n-workflow';
 
 import type { ChildProcess } from 'child_process';
 import type PCancelable from 'p-cancelable';
@@ -49,6 +49,7 @@ export class ActiveExecutions {
 				startedAt: new Date(),
 				workflowData: executionData.workflowData,
 				status: executionStatus,
+				workflowId: executionData.workflowData.id,
 			};
 
 			if (executionData.retryOf !== undefined) {
@@ -60,11 +61,9 @@ export class ActiveExecutions {
 				fullExecutionData.workflowId = workflowId;
 			}
 
-			const executionResult =
-				await Container.get(ExecutionRepository).createNewExecution(fullExecutionData);
-			executionId = executionResult.id;
+			executionId = await Container.get(ExecutionRepository).createNewExecution(fullExecutionData);
 			if (executionId === undefined) {
-				throw new Error('There was an issue assigning an execution id to the execution');
+				throw new ApplicationError('There was an issue assigning an execution id to the execution');
 			}
 			executionStatus = 'running';
 		} else {
@@ -98,9 +97,9 @@ export class ActiveExecutions {
 
 	attachWorkflowExecution(executionId: string, workflowExecution: PCancelable<IRun>) {
 		if (this.activeExecutions[executionId] === undefined) {
-			throw new Error(
-				`No active execution with id "${executionId}" got found to attach to workflowExecution to!`,
-			);
+			throw new ApplicationError('No active execution found to attach to workflow execution to', {
+				extra: { executionId },
+			});
 		}
 
 		this.activeExecutions[executionId].workflowExecution = workflowExecution;
@@ -111,9 +110,9 @@ export class ActiveExecutions {
 		responsePromise: IDeferredPromise<IExecuteResponsePromiseData>,
 	): void {
 		if (this.activeExecutions[executionId] === undefined) {
-			throw new Error(
-				`No active execution with id "${executionId}" got found to attach to workflowExecution to!`,
-			);
+			throw new ApplicationError('No active execution found to attach to workflow execution to', {
+				extra: { executionId },
+			});
 		}
 
 		this.activeExecutions[executionId].responsePromise = responsePromise;
@@ -179,7 +178,7 @@ export class ActiveExecutions {
 			this.activeExecutions[executionId].workflowExecution!.cancel();
 		}
 
-		return this.getPostExecutePromise(executionId);
+		return await this.getPostExecutePromise(executionId);
 	}
 
 	/**
@@ -198,7 +197,7 @@ export class ActiveExecutions {
 
 		this.activeExecutions[executionId].postExecutePromises.push(waitPromise);
 
-		return waitPromise.promise();
+		return await waitPromise.promise();
 	}
 
 	/**

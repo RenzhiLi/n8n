@@ -24,20 +24,18 @@ import {
 let authOwnerAgent: SuperAgentTest;
 let authMemberAgent: SuperAgentTest;
 
-const licenseLike = mockInstance(License, {
-	isExternalSecretsEnabled: jest.fn().mockReturnValue(true),
-	isWithinUsersLimit: jest.fn().mockReturnValue(true),
-});
-
 const mockProvidersInstance = new MockProviders();
 mockInstance(ExternalSecretsProviders, mockProvidersInstance);
 
-const testServer = setupTestServer({ endpointGroups: ['externalSecrets'] });
+const testServer = setupTestServer({
+	endpointGroups: ['externalSecrets'],
+	enabledFeatures: ['feat:externalSecrets'],
+});
 
 const connectedDate = '2023-08-01T12:32:29.000Z';
 
 async function setExternalSecretsSettings(settings: ExternalSecretsSettings) {
-	return Container.get(SettingsRepository).saveEncryptedSecretsProviderSettings(
+	return await Container.get(SettingsRepository).saveEncryptedSecretsProviderSettings(
 		Container.get(Cipher).encrypt(settings),
 	);
 }
@@ -47,7 +45,7 @@ async function getExternalSecretsSettings(): Promise<ExternalSecretsSettings | n
 	if (encSettings === null) {
 		return null;
 	}
-	return jsonParse(Container.get(Cipher).decrypt(encSettings));
+	return await jsonParse(Container.get(Cipher).decrypt(encSettings));
 }
 
 const resetManager = async () => {
@@ -57,7 +55,7 @@ const resetManager = async () => {
 		new ExternalSecretsManager(
 			mock(),
 			Container.get(SettingsRepository),
-			licenseLike,
+			Container.get(License),
 			mockProvidersInstance,
 			Container.get(Cipher),
 		),
@@ -107,8 +105,6 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-	licenseLike.isExternalSecretsEnabled.mockReturnValue(true);
-
 	mockProvidersInstance.setProviders({
 		dummy: DummyProvider,
 	});
@@ -339,7 +335,7 @@ describe('POST /external-secrets/providers/:provider/update', () => {
 			'update',
 		);
 
-		licenseLike.isExternalSecretsEnabled.mockReturnValue(false);
+		testServer.license.disable('feat:externalSecrets');
 
 		const resp = await authOwnerAgent.post('/external-secrets/providers/dummy/update');
 		expect(resp.status).toBe(400);
